@@ -7,7 +7,7 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.llms import OpenAI
-
+from langchain.callbacks import get_openai_callback
 
 
 
@@ -41,7 +41,7 @@ class PDFChatBot:
             # Split the text inside the pdf into chunks
             self.text_splitter = CharacterTextSplitter(        
                 separator="\n",
-                chunk_size=1500,
+                chunk_size=1250,
                 chunk_overlap=200,
                 length_function=len
             )
@@ -62,7 +62,7 @@ class PDFChatBot:
 
             {
                 'name': "owner's name",
-                'contact': "owner's contact information",
+                'contact': "owner's contact information separated by commas",
                 'experience': [
                     {
                         'company_name': 'first work experience company name',
@@ -89,69 +89,73 @@ class PDFChatBot:
 
         if self.query:
             docs = self.knowledge_base.similarity_search(self.query)
-            self.llm = OpenAI()
+            self.llm = OpenAI(max_tokens=512)
             self.chain = load_qa_chain(self.llm, chain_type='stuff')
             response = self.chain.run(input_documents=docs, question=self.query)
             st.write(response)
+            st.write(self.llm)
+            with get_openai_callback() as cb:
+                response = self.chain.run(input_documents=docs, question=self.query)
+                print(cb)
+                st.write(cb)
+                data = eval(response)
+                for key, value in data.items():
+                    if ',' in value:
+                        data[key] = [item.strip() for item in value.split(',')]
 
-            data = eval(response)
-            for key, value in data.items():
-                if ',' in value:
-                    data[key] = [item.strip() for item in value.split(',')]
+                self.name = data['name']
+                self.contact = data['contact']
+                self.experience = data['experience']
+                self.educationalBackground = data['educationalBackground']
+                self.technicalSkills = data['technicalSkills']
+                # self.certifications = data['certifications']
 
-            self.name = data['name']
-            self.contact = data['contact']
-            self.experience = data['experience']
-            self.educationalBackground = data['educationalBackground']
-            self.technicalSkills = data['technicalSkills']
-            # self.certifications = data['certifications']
+                st.text('Name: ')
+                st.text_input('Name: ', self.name, disabled=True, label_visibility='collapsed')
+                st.text('Contact Information: ')
+                if isinstance(self.contact, list):
+                    for element in self.contact:
+                        st.text_input('Contacts: ', element, disabled=True, label_visibility='collapsed')
+                else:
+                    st.text_input('Contact: ', self.contact, disabled=True, label_visibility='collapsed')
 
-            st.text('Name: ')
-            st.text_input('Name: ', self.name, disabled=True, label_visibility='collapsed')
-            st.text('Contact Information: ')
-            if isinstance(self.contact, list):
-                for element in self.contact:
-                    st.text_input('Contacts: ', element, disabled=True, label_visibility='collapsed')
-            else:
-                st.text_input('Contact: ', self.contact, disabled=True, label_visibility='collapsed')
+                st.text('Experiences: ')
+                for experience in self.experience:
+                    company_name = experience['company_name']
+                    job_date = experience['job_date']
+                    job_title = experience['job_title']
+                    job_description = experience['job_description']
 
-            st.text('Experiences: ')
-            for experience in self.experience:
-                company_name = experience['company_name']
-                job_date = experience['job_date']
-                job_title = experience['job_title']
-                job_description = experience['job_description']
+                    st.text('Company Name')
+                    st.text_input('Company Name: ', company_name, disabled=True, label_visibility='collapsed')
+                    st.text('Job Date')
+                    st.text_input('Job Date: ', job_date, disabled=True, label_visibility='collapsed')
+                    st.text('Job Title')
+                    st.text_input('Job Title: ', job_title, disabled=True, label_visibility='collapsed')
+                    st.text('Job Description')
+                    st.text_area('Job Description: ', value=job_description, disabled=True, label_visibility='collapsed')
 
-                st.text('Company Name')
-                st.text_input('Company Name: ', company_name, disabled=True, label_visibility='collapsed')
-                st.text('Job Date')
-                st.text_input('Job Date: ', job_date, disabled=True, label_visibility='collapsed')
-                st.text('Job Title')
-                st.text_input('Job Title: ', job_title, disabled=True, label_visibility='collapsed')
-                st.text('Job Description')
-                st.text_area('Job Description: ', value=job_description, disabled=True, label_visibility='collapsed')
-
-            self.school = self.educationalBackground['school']
-            self.course = self.educationalBackground['course']
-            self.year = self.educationalBackground['year']
-            st.text('Education: ')
-            st.text('Institution')
-            st.text_input('School Attended: ', self.school, disabled=True, label_visibility='collapsed')
-            st.text('Course')
-            st.text_input('School Attended: ', self.course, disabled=True, label_visibility='collapsed')
-            st.text('Year Graduated')
-            st.text_input('School Attended: ', self.year, disabled=True, label_visibility='collapsed')
+                self.school = self.educationalBackground['school']
+                self.course = self.educationalBackground['course']
+                self.year = self.educationalBackground['year']
+                st.text('Education: ')
+                st.text('Institution')
+                st.text_input('School Attended: ', self.school, disabled=True, label_visibility='collapsed')
+                st.text('Course')
+                st.text_input('School Attended: ', self.course, disabled=True, label_visibility='collapsed')
+                st.text('Year Graduated')
+                st.text_input('School Attended: ', self.year, disabled=True, label_visibility='collapsed')
 
 
-            # st.text_input('Education: ', self.educationalBackground, disabled=True, label_visibility='collapsed')
-            st.text('Technical Skills: ')
-            if isinstance(self.technicalSkills, list):
-                for element in self.technicalSkills:
-                    st.text_input('Technical Skills: ', element, disabled=True, label_visibility='collapsed')
-            # st.text('Certifications: ')
-            # if isinstance(self.certifications, list):
-            #     for element in self.certifications:
-            #         st.text_input('Certifications: ', element, disabled=True, label_visibility='collapsed')
+                # st.text_input('Education: ', self.educationalBackground, disabled=True, label_visibility='collapsed')
+                st.text('Technical Skills: ')
+                if isinstance(self.technicalSkills, list):
+                    for element in self.technicalSkills:
+                        st.text_input('Technical Skills: ', element, disabled=True, label_visibility='collapsed')
+                # st.text('Certifications: ')
+                # if isinstance(self.certifications, list):
+                #     for element in self.certifications:
+                #         st.text_input('Certifications: ', element, disabled=True, label_visibility='collapsed')
 
 if __name__ == '__main__':
     bot = PDFChatBot()
