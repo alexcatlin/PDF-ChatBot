@@ -23,12 +23,15 @@ class PDFChatBot:
         self.query = ""
         self.llm = None
         self.chain = None
+        self.option = ''
 
     def run(self):
         # Sets the Ui of the application
         st.set_page_config(page_title="ResumePro: AI-Powered Resume Information Extraction")
         st.header("ResumePro: AI-Powered Resume Information Extraction")
+        self.option = st.selectbox('What would you like to upload? ', ('Resume', 'Invoice') )
         self.pdf = st.file_uploader("Upload a resume", type="pdf")
+
 
         # IF a pdf file is uploaded then it will be parsed into a PdfReader lib
         # I will then extract the text from the pdf and save it in the var text
@@ -57,7 +60,8 @@ class PDFChatBot:
 
     # Search the pdf for similarity and then uses qa chain lib for chatGPT's response.
     def _ask_query(self):
-        self.query = '''
+        if self.option == 'Resume':
+            self.query = '''
             Follow this format and insert the owner's information in the values. Do not copy the value:
 
             {
@@ -85,12 +89,43 @@ class PDFChatBot:
 
             Send out the complete response and format it like a Python dictionary so that I can do eval() method on it later. Remove any bullet points
             '''
-        
+        elif self.option == 'Invoice':
+            self.query = '''
+            Follow this format and insert the proper information as values. Do not copy the value. if empty, just put 'none' as the value:
+
+            {
+                'shipper': "shipper's details (add a newline after every indiv detail)",
+                'consignee': "consignee's details (add a newline after every indiv detail)",
+                'notify_party': "notify party's details (separate the details with a new line)" ,
+                'vessel':'what vessel will be used within this delivery',
+                'loading_port':'port of loading',
+                'discharge_port':'port of discharge',
+
+                'packages_info': [
+                    {   'mark_nos': 'mark and number of the pallets of the package',
+                        'num_kind': 'what does the package contain?',
+                        'desc': 'description of goods',
+                        'gross_weight': 'package gross weight',
+                        'net_weight': 'package net weight'
+
+                    }
+                ],
+
+                'freight_info': 'freight, charges, etc',
+                'freight_paid_at':'freight to be paid at',
+                'place_date': 'place and date of issue',
+                
+            
+            }
+
+            Send out the complete response and format it like a Python dictionary so that I can do eval() method on it later. Remove any bullet points
+            '''
+    
         response = ''
 
         if self.query:
             docs = self.knowledge_base.similarity_search(self.query)
-            self.llm = OpenAI(max_tokens=1024)
+            self.llm = OpenAI(max_tokens=2048)
             self.chain = load_qa_chain(self.llm, chain_type='stuff')
             with get_openai_callback() as cb:
                 response = self.chain.run(input_documents=docs, question=self.query)
@@ -104,60 +139,97 @@ class PDFChatBot:
                 if ',' in value:
                     data[key] = [item.strip() for item in value.split(',')]
 
-            self.name = data['name']
-            self.contact = data['contact']
-            self.experience = data['experience']
-            self.educationalBackground = data['educationalBackground']
-            self.technicalSkills = data['technicalSkills']
-            self.certifications = data['certifications']
+            if self.option == 'Resume':
 
-            st.text('Name: ')
-            st.text_input('Name: ', self.name, disabled=True, label_visibility='collapsed')
-            st.text('Contact Information: ')
-            if isinstance(self.contact, list):
-                for element in self.contact:
-                    st.text_input('Contacts: ', element, disabled=True, label_visibility='collapsed')
-            else:
-                st.text_input('Contact: ', self.contact, disabled=True, label_visibility='collapsed')
+                self.name = data['name']
+                self.contact = data['contact']
+                self.experience = data['experience']
+                self.educationalBackground = data['educationalBackground']
+                self.technicalSkills = data['technicalSkills']
+                self.certifications = data['certifications']
 
-            st.text('Experiences: ')
-            for experience in self.experience:
-                company_name = experience['company_name']
-                job_date = experience['job_date']
-                job_title = experience['job_title']
-                job_description = experience['job_description']
+                st.text('Name: ')
+                st.text_input('Name: ', self.name, disabled=True, label_visibility='collapsed')
+                st.text('Contact Information: ')
+                if isinstance(self.contact, list):
+                    for element in self.contact:
+                        st.text_input('Contacts: ', element, disabled=True, label_visibility='collapsed')
+                else:
+                    st.text_input('Contact: ', self.contact, disabled=True, label_visibility='collapsed')
 
-                st.text('Company Name')
-                st.text_input('Company Name: ', company_name, disabled=True, label_visibility='collapsed')
-                st.text('Job Date')
-                st.text_input('Job Date: ', job_date, disabled=True, label_visibility='collapsed')
-                st.text('Job Title')
-                st.text_input('Job Title: ', job_title, disabled=True, label_visibility='collapsed')
-                st.text('Job Description')
-                st.text_area('Job Description: ', value=job_description, disabled=True, label_visibility='collapsed')
+                st.text('Experiences: ')
+                for experience in self.experience:
+                    company_name = experience['company_name']
+                    job_date = experience['job_date']
+                    job_title = experience['job_title']
+                    job_description = experience['job_description']
 
-            self.school = self.educationalBackground['school']
-            self.course = self.educationalBackground['course']
-            self.year = self.educationalBackground['year']
-            st.text('Education: ')
-            st.text('Institution')
-            st.text_input('School Attended: ', self.school, disabled=True, label_visibility='collapsed')
-            st.text('Course')
-            st.text_input('School Attended: ', self.course, disabled=True, label_visibility='collapsed')
-            st.text('Year Graduated')
-            st.text_input('School Attended: ', self.year, disabled=True, label_visibility='collapsed')
+                    st.text('Company Name')
+                    st.text_input('Company Name: ', company_name, disabled=True, label_visibility='collapsed')
+                    st.text('Job Date')
+                    st.text_input('Job Date: ', job_date, disabled=True, label_visibility='collapsed')
+                    st.text('Job Title')
+                    st.text_input('Job Title: ', job_title, disabled=True, label_visibility='collapsed')
+                    st.text('Job Description')
+                    st.text_area('Job Description: ', value=job_description, disabled=True, label_visibility='collapsed')
+
+                self.school = self.educationalBackground['school']
+                self.course = self.educationalBackground['course']
+                self.year = self.educationalBackground['year']
+                st.text('Education: ')
+                st.text('Institution')
+                st.text_input('School Attended: ', self.school, disabled=True, label_visibility='collapsed')
+                st.text('Course')
+                st.text_input('School Attended: ', self.course, disabled=True, label_visibility='collapsed')
+                st.text('Year Graduated')
+                st.text_input('School Attended: ', self.year, disabled=True, label_visibility='collapsed')
 
 
-            # st.text_input('Education: ', self.educationalBackground, disabled=True, label_visibility='collapsed')
-            st.text('Technical Skills: ')
-            if isinstance(self.technicalSkills, list):
-                for element in self.technicalSkills:
-                    st.text_input('Technical Skills: ', element, disabled=True, label_visibility='collapsed')
-            st.text('Certifications: ')
-            if isinstance(self.certifications, list):
-                for element in self.certifications:
-                    st.text_input('Certifications: ', element, disabled=True, label_visibility='collapsed')
+                # st.text_input('Education: ', self.educationalBackground, disabled=True, label_visibility='collapsed')
+                st.text('Technical Skills: ')
+                if isinstance(self.technicalSkills, list):
+                    for element in self.technicalSkills:
+                        st.text_input('Technical Skills: ', element, disabled=True, label_visibility='collapsed')
+                st.text('Certifications: ')
+                if isinstance(self.certifications, list):
+                    for element in self.certifications:
+                        st.text_input('Certifications: ', element, disabled=True, label_visibility='collapsed')
+            if self.option == 'Invoice':
+                self.shipper = data['shipper']
+                self.consignee = data['consignee']
+                self.notify_party = data['notify_party']
+                self.vessel = data['vessel']
+                self.loading_port = data['loading_port']
+                self.discharge_port = data['discharge_port']
+                self.package_info = data['packages_info']
+                self.freight_info = data['freight_info']
+                self.freight_paid_at = data['freight_paid_at']
+                self.place_date = data['place_date']
 
+                st.text("Shipper's details: ")
+                st.text_area('Shipper Details: ', self.shipper, disabled=True, label_visibility='collapsed')
+                st.text("Consignee's details: ")
+                st.text_area('Consignee Details: ', self.consignee, disabled=True, label_visibility='collapsed')
+                st.text("Notify Party's details: ")
+                st.text_area("Notify Party's details: ", self.consignee, disabled=True, label_visibility='collapsed')
+                st.text("Vessel: ")
+                st.text_area('Vessel: ', self.vessel, disabled=True, label_visibility='collapsed')
+                st.text("Loading Port: ")
+                st.text_area('Loading Port: ', self.loading_port, disabled=True, label_visibility='collapsed')
+                st.text("Discharge Port: ")
+                st.text_area('Discharge Port: ', self.discharge_port, disabled=True, label_visibility='collapsed')
+                st.text("Package Info: ")
+                st.text_area('Package Info: ', self.package_info, disabled=True, label_visibility='collapsed')
+                st.text("Freight Info: ")
+                st.text_area('Freight Info: ', self.freight_info, disabled=True, label_visibility='collapsed')
+                st.text("Freight Paid at: ")
+                st.text_area('Freight Paid at: ', self.freight_paid_at, disabled=True, label_visibility='collapsed')
+                st.text("Place & Date: ")
+                st.text_area('Place & Date: ', self.place_date, disabled=True, label_visibility='collapsed')
+
+
+
+                
 if __name__ == '__main__':
     bot = PDFChatBot()
     bot.run()
