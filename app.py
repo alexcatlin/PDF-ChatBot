@@ -7,6 +7,7 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.llms import OpenAI
+from langchain import HuggingFaceHub
 from langchain.callbacks import get_openai_callback
 
 
@@ -30,6 +31,7 @@ class PDFChatBot:
         st.set_page_config(page_title="ResumePro: AI-Powered Resume Information Extraction")
         st.header("ResumePro: AI-Powered Resume Information Extraction")
         self.option = st.selectbox('What would you like to upload? ', ('Resume', 'Invoice') )
+        self.llms_choice = st.selectbox('LLMS Options', ("OpenAI", "HuggingFace"))
         self.pdf = st.file_uploader("Upload a resume", type="pdf")
 
 
@@ -94,25 +96,30 @@ class PDFChatBot:
             Follow this format and insert the proper information as values. Do not copy the value. if empty, just put 'none' as the value:
 
             {
-                'shipper': "shipper's details (add a newline after every indiv detail)",
-                'consignee': "consignee's details (add a newline after every indiv detail)",
-                'notify_party': "notify party's details (separate the details with a new line)" ,
+                'slwbNo': 'the slwbno of the shipment',
+                'shipper': "shipper's details (separate each details with a new line)",
+                'consignee': "consignee's details (separate each details with a new line)",
+                'notify_party': "notify party's details (separate each details with a new line)" ,
                 'vessel':'what vessel will be used within this delivery',
                 'loading_port':'port of loading',
                 'discharge_port':'port of discharge',
-
                 'packages_info': [
-                    {   'mark_nos': 'mark and number of the pallets of the package',
-                        'num_kind': 'what does the package contain?',
-                        'desc': 'description of goods',
+                    {   'mark_nos': 'total number of palletes',
+                        'num_kind': ['the number of palettes for the given product'],
+                        'desc': [
+                            { 'cartons': 'how many cartons and what does it contain',
+                                'net_weight_prod': 'net-weight of the product',
+                                'temp': 'temperature of the product',
+                                'ncm': 'ncm of the product'
+                            }, { (add more to this list if needed, separate each products details into dictionaries inside this list) }
+                            ],
                         'gross_weight': 'package gross weight',
                         'net_weight': 'package net weight'
-
-                    }
+                    }, (if necessary create more object that contains the details like the last one)
                 ],
 
-                'freight_info': 'freight, charges, etc',
-                'freight_paid_at':'freight to be paid at',
+                'freight_info': 'freight, charges, etc (if no data, just leave it blank)',
+                'freight_paid_at':'freight to be paid at (if no data, just leave it blank)',
                 'place_date': 'place and date of issue',
                 
             
@@ -125,22 +132,25 @@ class PDFChatBot:
 
         if self.query:
             docs = self.knowledge_base.similarity_search(self.query)
-            self.llm = OpenAI(max_tokens=2048)
+            if self.llms_choice == "OpenAI":
+                self.llm = OpenAI(max_tokens=2048)
+            elif self.llms_choice == "HuggingFace":
+                repo_id = "stabilityai/stablelm-tuned-alpha-3b"
+                self.llm = HuggingFaceHub(repo_id=repo_id, model_kwargs={"temperature":0, "max_length":64})
+
+
             self.chain = load_qa_chain(self.llm, chain_type='stuff')
             with get_openai_callback() as cb:
                 response = self.chain.run(input_documents=docs, question=self.query)
                 st.write(response)
-                st.write(self.llm)
-                print(cb)
                 st.write(cb)
 
             data = eval(response)
-            for key, value in data.items():
-                if ',' in value:
-                    data[key] = [item.strip() for item in value.split(',')]
 
             if self.option == 'Resume':
-
+                for key, value in data.items():
+                    if ',' in value:
+                        data[key] = [item.strip() for item in value.split(',')]
                 self.name = data['name']
                 self.contact = data['contact']
                 self.experience = data['experience']
@@ -195,6 +205,7 @@ class PDFChatBot:
                     for element in self.certifications:
                         st.text_input('Certifications: ', element, disabled=True, label_visibility='collapsed')
             if self.option == 'Invoice':
+                self.slwbNo = data['slwbNo']
                 self.shipper = data['shipper']
                 self.consignee = data['consignee']
                 self.notify_party = data['notify_party']
@@ -206,6 +217,8 @@ class PDFChatBot:
                 self.freight_paid_at = data['freight_paid_at']
                 self.place_date = data['place_date']
 
+                st.text("SLWB No.")
+                st.text_input('SLWB No.: ', self.slwbNo, disabled=True, label_visibility='collapsed')
                 st.text("Shipper's details: ")
                 st.text_area('Shipper Details: ', self.shipper, disabled=True, label_visibility='collapsed')
                 st.text("Consignee's details: ")
@@ -213,19 +226,69 @@ class PDFChatBot:
                 st.text("Notify Party's details: ")
                 st.text_area("Notify Party's details: ", self.consignee, disabled=True, label_visibility='collapsed')
                 st.text("Vessel: ")
-                st.text_area('Vessel: ', self.vessel, disabled=True, label_visibility='collapsed')
+                st.text_input('Vessel: ', self.vessel, disabled=True, label_visibility='collapsed')
                 st.text("Loading Port: ")
-                st.text_area('Loading Port: ', self.loading_port, disabled=True, label_visibility='collapsed')
+                st.text_input('Loading Port: ', self.loading_port, disabled=True, label_visibility='collapsed')
                 st.text("Discharge Port: ")
-                st.text_area('Discharge Port: ', self.discharge_port, disabled=True, label_visibility='collapsed')
-                st.text("Package Info: ")
-                st.text_area('Package Info: ', self.package_info, disabled=True, label_visibility='collapsed')
+                st.text_input('Discharge Port: ', self.discharge_port, disabled=True, label_visibility='collapsed')
+
+                for info in self.package_info:
+                    mark_nos = info['mark_nos']
+                    num_kind = info['num_kind']
+                    desc = info['desc']
+                    gross_weight = info['gross_weight']
+                    net_weight = info['net_weight']
+
+                    st.text("Packages Info: ")
+                    st.text('Total Palettes: ')
+                    st.text_input('Mark No.: ', mark_nos, disabled=True, key=f"mark_no_{mark_nos}", label_visibility='collapsed')
+                    
+                    for i, num in enumerate(num_kind):
+                        st.text('Number of palettes: ')
+                        st.text_input('Num kind: ', num, disabled=True, key=f"num_kind_{i}", label_visibility='collapsed')
+                        
+                        if i < len(desc):
+                            obj = desc[i]
+                            cartons = obj['cartons']
+                            net_weight_prod = obj['net_weight_prod']
+                            temp = obj['temp']
+                            ncm = obj['ncm']
+
+                            st.text('Cartons')
+                            st.text_input('Cartons: ', cartons, disabled=True, key=f"cartons_{i}", label_visibility='collapsed')
+                            st.text('Net Weight')
+                            st.text_input('Net Weight Prod: ', net_weight_prod, disabled=True, key=f"net_weight_prod_{i}", label_visibility='collapsed')
+                            st.text('Temp:')
+                            st.text_input('Temp: ', temp, disabled=True, key=f"temp_{i}", label_visibility='collapsed')
+                            st.text('NCM:')
+                            st.text_input('NCM: ', ncm, disabled=True, key=f"ncm_{i}", label_visibility='collapsed')
+                            
+                    for i in range(len(num_kind), len(desc)):
+                        obj = desc[i]
+                        cartons = obj['cartons']
+                        net_weight_prod = obj['net_weight_prod']
+                        temp = obj['temp']
+                        ncm = obj['ncm']
+
+                        st.text('Cartons')
+                        st.text_input('Cartons: ', cartons, disabled=True, key=f"cartons_{i}", label_visibility='collapsed')
+                        st.text('Net Weight')
+                        st.text_input('Net Weight Prod: ', net_weight_prod, disabled=True, key=f"net_weight_prod_{i}", label_visibility='collapsed')
+                        st.text('Temp:')
+                        st.text_input('Temp: ', temp, disabled=True, key=f"temp_{i}", label_visibility='collapsed')
+                        st.text('NCM:')
+                        st.text_input('NCM: ', ncm, disabled=True, key=f"ncm_{i}", label_visibility='collapsed')
+                    st.text('Gross Weight.')
+                    st.text_input('Gross Weight: ', gross_weight, disabled=True, key="gross_weight", label_visibility='collapsed')
+                    st.text('Net Weight')
+                    st.text_input('Net Weight: ', net_weight, disabled=True, key="net_weight", label_visibility='collapsed')
+
                 st.text("Freight Info: ")
-                st.text_area('Freight Info: ', self.freight_info, disabled=True, label_visibility='collapsed')
+                st.text_input('Freight Info: ', self.freight_info, disabled=True, label_visibility='collapsed')
                 st.text("Freight Paid at: ")
                 st.text_area('Freight Paid at: ', self.freight_paid_at, disabled=True, label_visibility='collapsed')
                 st.text("Place & Date: ")
-                st.text_area('Place & Date: ', self.place_date, disabled=True, label_visibility='collapsed')
+                st.text_input('Place & Date: ', self.place_date, disabled=True, label_visibility='collapsed')
 
 
 
