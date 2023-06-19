@@ -6,3 +6,5 @@ openai
 tiktoken
 faiss-cpu
 huggingface_hub
+xero_python
+extra-streamlit-components

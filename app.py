@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+import requests
+
 import streamlit as st
 from PyPDF2 import PdfReader 
 from langchain.text_splitter import CharacterTextSplitter
@@ -8,6 +11,9 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain.chat_models import ChatOpenAI
 import openai
 
+# from xero.index im    port XeroAPI
+
+load_dotenv()
 
 class PDFChatBot:
     def __init__(self):
@@ -22,7 +28,6 @@ class PDFChatBot:
         self.chain = None
         self.option = ''
         self.response = ''
-
 
     def disable(self, b):
         st.session_state["disabled"] = b
@@ -368,40 +373,48 @@ class PDFChatBot:
 
         st.header("Procurement")
         st.text('Customer Name: ')
-        st.text_input('Customer Name: ', customer_name, disabled=True, label_visibility='collapsed')
+        st.text_input('Customer Name: ', customer_name, disabled=False, label_visibility='collapsed')
         st.text('Quote Informations: ')
         for key, value in quote_info.items():
             if key == 'quote_address':
                 st.text("Quote Address:")
-                st.text_area('', value, disabled=True, key="quote_address", label_visibility='collapsed')
+                st.text_area('', value, disabled=False, key="quote_address", label_visibility='collapsed')
             else:
                 st.text(key.capitalize() + ':')
-                st.text_input('', value, disabled=True, key=f"quote_info_{key}", label_visibility='collapsed')
+                st.text_input('', value, disabled=False, key=f"quote_info_{key}", label_visibility='collapsed')
 
         st.text("Customer Information")
         for key, value in customer_details.items():
             st.text(key.capitalize() + ':')
-            st.text_input('', value, disabled=True, key=f"customer_details_{key}", label_visibility='collapsed')                 
+            st.text_input('', value, disabled=False, key=f"customer_details_{key}", label_visibility='collapsed')                 
 
         for key, value in billing.items():
             st.text(key.capitalize() + ':')
-            st.text_area('', value, disabled=True, key=f"billing_{key}", label_visibility='collapsed')
+            st.text_area('', value, disabled=False, key=f"billing_{key}", label_visibility='collapsed')
 
         st.text('Pricing Summary:')
         for i, product in enumerate(pricing_summary):
             st.text('Product Name:')
-            st.text_input('', product['product name'], disabled=True, key=f"product_name_{i}", label_visibility='collapsed')
+            st.text_input('', product['product name'], disabled=False, key=f"product_name_{i}", label_visibility='collapsed')
             st.text('Quantity:')
-            st.text_input('', str(product['qty']), disabled=True, key=f"quantity_{i}", label_visibility='collapsed')
+            st.text_input('', str(product['qty']), disabled=False, key=f"quantity_{i}", label_visibility='collapsed')
             st.text('List Price:')
-            st.text_input('', str(product['list_price']), disabled=True, key=f"list_price_{i}", label_visibility='collapsed')
+            st.text_input('', str(product['list_price']), disabled=False, key=f"list_price_{i}", label_visibility='collapsed')
             st.text('Unit Price:')
-            st.text_input('', str(product['unit_price']), disabled=True, key=f"unit_price_{i}", label_visibility='collapsed')
+            st.text_input('', str(product['unit_price']), disabled=False, key=f"unit_price_{i}", label_visibility='collapsed')
             st.text('Net Price:')
-            st.text_input('', str(product['net_price']), disabled=True, key=f"net_price_{i}", label_visibility='collapsed')
+            st.text_input('', str(product['net_price']), disabled=False, key=f"net_price_{i}", label_visibility='collapsed')
             st.text('Markup:')
-            st.text_input('', product['mark_up'], disabled=True, key=f"markup_{i}", label_visibility='collapsed')
+            st.text_input('', product['mark_up'], disabled=False, key=f"markup_{i}", label_visibility='collapsed')
+        
+        st.button('Save Invoice to your Xero Account', key="button", disabled=False)
+        
 
 if __name__ == '__main__':
     bot = PDFChatBot()
     bot.run()
+
+    xeroApi = XeroAPI()
+    xeroApi.getAuthorization()
+    # xeroApi.getInvoices(access_token=cookies['xero_access_token'], tenant_id=selected_tenant['tenantId'])
+    
