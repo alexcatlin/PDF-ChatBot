@@ -7,7 +7,12 @@ from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.chat_models import ChatOpenAI
 import openai
+from dotenv import load_dotenv
+import json
 
+
+
+load_dotenv()
 
 class PDFChatBot:
     def __init__(self):
@@ -22,7 +27,7 @@ class PDFChatBot:
         self.chain = None
         self.option = ''
         self.response = ''
-        self.api_key = os.environ["OPENAI_API_KEY"]
+        self.api_key = os.getenv("OPENAI_API_KEY")
 
 
     def disable(self, b):
@@ -213,13 +218,16 @@ class PDFChatBot:
                         self.procurement()
                     else:
                         st.markdown(""":red[Error: This file isn't a procurement file. Please upload a procurement file or choose other options] """)
+
                 st.button("Export to JSON", key='json', on_click=self.exportToJson)
                 
             except openai.error.InvalidRequestError:
                 st.markdown(""":red[Error: Maximum context length exceeded. Please cut down your pdf and upload only the necessary pages.] """)
                 return
+            
     def exportToJson(self):
-        st.code(self.data, language='python', line_numbers=False)
+        json_str = json.dumps(self.data, indent=4)
+        st.code(json_str, language='python', line_numbers=False)
 
     # Logic behind the different types of UI per query
     def resume_query(self):
