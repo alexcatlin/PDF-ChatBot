@@ -22,6 +22,7 @@ class PDFChatBot:
         self.chain = None
         self.option = ''
         self.response = ''
+        self.api_key = os.environ["OPENAI_API_KEY"]
 
 
     def disable(self, b):
@@ -34,7 +35,7 @@ class PDFChatBot:
         self.option = st.selectbox('What would you like to upload?', ('Resume', 'Bill of loading', "Ask your pdf", "Procurement"))
         self.model = st.selectbox('Model Options', ("text-davinci-003", "gpt-3.5-turbo"))
         self.pdf = st.file_uploader("Upload a pdf", type="pdf")
-
+        print(self.api_key)
         # If a pdf file is uploaded, it will be parsed into a PdfReader lib
         # The text will be extracted from the pdf and saved in the 'text' variable
         if self.pdf is not None:
@@ -73,7 +74,7 @@ class PDFChatBot:
 
     # Create embeddings based on the chunks created
     def _create_embeddings(self):
-        self.embeddings = OpenAIEmbeddings(openai_api_key=os.getenv("OPENAI_API_KEY"))
+        self.embeddings = OpenAIEmbeddings(openai_api_key=self.api_key)
         chunks = self.text_splitter.split_text(self.text)
         self.knowledge_base = FAISS.from_texts(chunks, self.embeddings)
 
@@ -185,8 +186,9 @@ class PDFChatBot:
         
         if self.query:
             docs = self.knowledge_base.similarity_search(self.query)
-            self.llm = ChatOpenAI(max_tokens=2048, model_name=self.model)
+            self.llm = ChatOpenAI(max_tokens=2048, model_name=self.model, openai_api_key=self.api_key)
             self.chain = load_qa_chain(self.llm, chain_type='stuff')
+            print(os.environ)
             try:
                 self.response = self.chain.run(input_documents=docs, question=self.query)
                 st.write(self.response)
@@ -211,10 +213,13 @@ class PDFChatBot:
                         self.procurement()
                     else:
                         st.markdown(""":red[Error: This file isn't a procurement file. Please upload a procurement file or choose other options] """)
+                st.button("Export to JSON", key='json', on_click=self.exportToJson)
                 
             except openai.error.InvalidRequestError:
                 st.markdown(""":red[Error: Maximum context length exceeded. Please cut down your pdf and upload only the necessary pages.] """)
                 return
+    def exportToJson(self):
+        st.code(self.data, language='python', line_numbers=False)
 
     # Logic behind the different types of UI per query
     def resume_query(self):
